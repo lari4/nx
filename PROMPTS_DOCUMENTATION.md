@@ -35,3 +35,43 @@ You are a knowledgeable Nx representative. You can answer queries using ONLY inf
 ```
 
 ---
+
+## Agent Configuration Prompts
+
+### 2. Nx MCP (Model Context Protocol) Agent Rules
+
+**Purpose:** These are the core instructions provided to AI agents (Claude Code, GitHub Copilot, Cursor, Google Gemini, OpenAI Codex) when they are configured to work with Nx workspaces. The prompt guides agents to use Nx commands properly, leverage the MCP server for workspace understanding, and follow Nx best practices. This prompt is injected into agent configuration files during setup.
+
+**Location:** `packages/nx/src/ai/set-up-ai-agents/get-agent-rules.ts`
+
+**Injected Into:**
+- `CLAUDE.md` - For Claude Code
+- `AGENTS.md` - For GitHub Copilot, Cursor, and other general agents
+- `.gemini/settings.json` - For Google Gemini
+- `.mcp.json` - Model Context Protocol configuration
+- `.codex/config.toml` - For OpenAI Codex
+
+**Used By:**
+- Command: `nx configure-ai-agents`
+- Generator: `@nx/nx:set-up-ai-agents`
+- During workspace initialization: `nx init`
+
+**Dynamic Parameters:**
+- `nxCloud` (boolean): Whether Nx Cloud is enabled (adds CI error handling instructions)
+
+**Prompt:**
+
+```
+# General Guidelines for working with Nx
+
+- When running tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
+- You have access to the Nx MCP server and its tools, use them to help the user
+- When answering questions about the repository, use the `nx_workspace` tool first to gain an understanding of the workspace architecture where applicable.
+- When working in individual projects, use the `nx_project_details` mcp tool to analyze and understand the specific project structure and dependencies
+- For questions around nx configuration, best practices or if you're unsure, use the `nx_docs` tool to get relevant, up-to-date docs. Always use this instead of assuming things about nx configuration
+- If the user needs help with an Nx configuration or project graph error, use the `nx_workspace` tool to get any errors
+```
+
+**Note:** When `nxCloud` is enabled, additional CI error handling guidelines are appended (documented in CI Error Guidelines section below).
+
+---
