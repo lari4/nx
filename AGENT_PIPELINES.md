@@ -890,4 +890,490 @@ Any Nx package can create AI migration instructions:
 
 ---
 
+## CI Error Resolution Pipeline
+
+**Purpose:** Enables AI agents to diagnose and fix CI pipeline failures in Nx Cloud by retrieving execution details, analyzing error logs, and suggesting fixes. This pipeline is available when Nx Cloud is configured.
+
+**Components:**
+- MCP Tools: `nx_cloud_cipe_details`, `nx_cloud_fix_cipe_failure`
+- Agent Configuration: CI Error Guidelines (appended to CLAUDE.md/AGENTS.md)
+- Nx Cloud: Remote execution and log storage
+
+### Pipeline Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CI ERROR RESOLUTION PIPELINE                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+CI Failure Occurs
+    │
+    └─ Example: Build task fails in PR #123
+    │
+    ▼
+[1. User Requests Help from AI Agent]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   User: "The CI is failing, can you help me fix it?"                    │
+│                                                                           │
+│   AI reads CI Error Guidelines from agent configuration                  │
+│   (See PROMPTS_DOCUMENTATION.md #5)                                      │
+│                                                                           │
+│   Guidelines instruct AI to:                                             │
+│   1. Use nx_cloud_cipe_details to get CIPE list                         │
+│   2. Use nx_cloud_fix_cipe_failure to get task logs                     │
+│   3. Analyze logs and fix issues                                         │
+│   4. Validate by running the failed task locally                         │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[2. Retrieve CI Pipeline Execution (CIPE) Details]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • MCP Tool: nx_cloud_cipe_details                                      │
+│   • Command: Agent calls tool (abstracted from user)                     │
+│   • API: Queries Nx Cloud for recent pipeline executions                │
+│                                                                           │
+│   Response Example:                                                       │
+│   {                                                                       │
+│     "cipes": [                                                            │
+│       {                                                                   │
+│         "id": "cipe_123abc",                                             │
+│         "branch": "feature/new-api",                                     │
+│         "status": "failed",                                               │
+│         "createdAt": "2025-11-14T10:30:00Z",                            │
+│         "tasks": [                                                        │
+│           {                                                               │
+│             "id": "task_456def",                                         │
+│             "taskId": "api:build",                                       │
+│             "status": "failed",                                           │
+│             "agent": "nx-cloud-agent-3"                                  │
+│           },                                                              │
+│           {                                                               │
+│             "id": "task_789ghi",                                         │
+│             "taskId": "api:test",                                        │
+│             "status": "success",                                          │
+│             "agent": "nx-cloud-agent-1"                                  │
+│           }                                                               │
+│         ]                                                                 │
+│       }                                                                   │
+│     ]                                                                     │
+│   }                                                                       │
+│                                                                           │
+│   AI identifies: Task "api:build" (task_456def) failed                  │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[3. Retrieve Failed Task Logs]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • MCP Tool: nx_cloud_fix_cipe_failure                                  │
+│   • Input: CIPE ID (cipe_123abc) + Task ID (task_456def)                │
+│   • API: Fetches detailed logs from Nx Cloud                             │
+│                                                                           │
+│   Log Output Example:                                                     │
+│   ─────────────────────────────────────────────────────────              │
+│   > nx run api:build                                                     │
+│                                                                           │
+│   Building API project...                                                │
+│   ✓ Compiling TypeScript                                                 │
+│   ✓ Bundling assets                                                      │
+│   ✗ Type checking failed                                                 │
+│                                                                           │
+│   src/controllers/user.controller.ts:45:12                              │
+│   Error: Property 'email' does not exist on type 'User'.                │
+│                                                                           │
+│   43 |   async getUser(id: string) {                                     │
+│   44 |     const user = await this.userService.findById(id);            │
+│   45 |     return user.email;                                            │
+│      |            ^^^^^                                                   │
+│   46 |   }                                                                │
+│                                                                           │
+│   Build failed with 1 error                                              │
+│   ─────────────────────────────────────────────────────────              │
+│                                                                           │
+│   AI analyzes: TypeScript error, User type missing email property        │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[4. AI Analyzes Error and Identifies Root Cause]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   AI's Analysis Process:                                                 │
+│                                                                           │
+│   1. Parse error message:                                                │
+│      → "Property 'email' does not exist on type 'User'"                 │
+│                                                                           │
+│   2. Identify affected file:                                             │
+│      → src/controllers/user.controller.ts:45:12                         │
+│                                                                           │
+│   3. Understand context:                                                 │
+│      → User type definition needs email property                         │
+│                                                                           │
+│   4. Find User type definition:                                          │
+│      → Search for "interface User" or "type User"                       │
+│      → Locate: src/types/user.ts                                        │
+│                                                                           │
+│   5. Read User type file:                                                │
+│      interface User {                                                    │
+│        id: string;                                                       │
+│        name: string;                                                     │
+│        // email property missing!                                        │
+│      }                                                                    │
+│                                                                           │
+│   Root Cause: User interface incomplete                                  │
+│   Fix: Add email property to User type                                   │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[5. AI Proposes and Implements Fix]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   AI explains fix to user:                                               │
+│                                                                           │
+│   "I found the issue. The User type in src/types/user.ts is missing     │
+│    the email property that's being accessed in user.controller.ts.      │
+│    I'll add the email property to fix this."                             │
+│                                                                           │
+│   AI applies fix:                                                         │
+│                                                                           │
+│   File: src/types/user.ts                                                │
+│   ──────────────────────────                                             │
+│   BEFORE:                                                                 │
+│   interface User {                                                        │
+│     id: string;                                                           │
+│     name: string;                                                         │
+│   }                                                                       │
+│                                                                           │
+│   AFTER:                                                                  │
+│   interface User {                                                        │
+│     id: string;                                                           │
+│     name: string;                                                         │
+│     email: string;                                                        │
+│   }                                                                       │
+│   ──────────────────────────                                             │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[6. AI Validates Fix Locally]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   Following CI Error Guidelines instruction:                             │
+│   "Make sure that the problem is fixed by running the task"             │
+│                                                                           │
+│   AI runs the failed task locally:                                       │
+│                                                                           │
+│   Command: nx run api:build                                              │
+│                                                                           │
+│   Output:                                                                 │
+│   ─────────────────────────────────────────────────────────              │
+│   > nx run api:build                                                     │
+│                                                                           │
+│   Building API project...                                                │
+│   ✓ Compiling TypeScript                                                 │
+│   ✓ Type checking passed                                                 │
+│   ✓ Bundling assets                                                      │
+│                                                                           │
+│   Build completed successfully!                                          │
+│   ─────────────────────────────────────────────────────────              │
+│                                                                           │
+│   ✅ Fix validated: Build now passes                                     │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[7. AI Checks for Related Issues]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   AI proactively checks:                                                 │
+│                                                                           │
+│   1. Are there other usages of User type that might break?               │
+│      → Searches codebase for "User" type references                      │
+│      → Validates all access patterns                                      │
+│                                                                           │
+│   2. Run affected tests:                                                 │
+│      Command: nx affected -t test                                        │
+│      → Ensures no test regressions                                       │
+│                                                                           │
+│   3. Run type checking across workspace:                                 │
+│      Command: nx run-many -t type-check                                  │
+│      → Catches any cascade TypeScript errors                             │
+│                                                                           │
+│   All checks pass ✓                                                       │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[8. AI Reports Solution to User]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   AI's Report:                                                            │
+│                                                                           │
+│   ✅ CI Error Fixed                                                       │
+│                                                                           │
+│   Problem:                                                                │
+│   The api:build task was failing due to a TypeScript error in           │
+│   src/controllers/user.controller.ts. The code was trying to access     │
+│   user.email, but the User type definition was missing the email         │
+│   property.                                                               │
+│                                                                           │
+│   Solution:                                                               │
+│   Added email: string property to the User interface in                  │
+│   src/types/user.ts.                                                     │
+│                                                                           │
+│   Validation:                                                             │
+│   • ✓ Build now passes locally (nx run api:build)                       │
+│   • ✓ All affected tests pass (nx affected -t test)                     │
+│   • ✓ No TypeScript errors across workspace                              │
+│                                                                           │
+│   Files Changed:                                                          │
+│   • src/types/user.ts (+1 line)                                         │
+│                                                                           │
+│   Next Steps:                                                             │
+│   1. Commit the fix: git add . && git commit -m "fix(api): add email    │
+│      property to User type"                                              │
+│   2. Push to trigger CI re-run                                           │
+│   3. CI should pass on next run                                          │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### MCP Tool Details
+
+#### nx_cloud_cipe_details
+
+**Purpose:** Retrieve list of recent CI Pipeline Executions
+
+**Parameters:** None (auto-detects workspace)
+
+**Returns:**
+```typescript
+{
+  cipes: Array<{
+    id: string;              // CIPE identifier
+    branch: string;          // Git branch
+    commit: string;          // Git SHA
+    status: 'success' | 'failed' | 'running';
+    createdAt: string;       // ISO timestamp
+    tasks: Array<{
+      id: string;            // Task identifier
+      taskId: string;        // Nx task (e.g., "api:build")
+      status: 'success' | 'failed' | 'skipped';
+      agent: string;         // Which agent ran the task
+      cached: boolean;       // Whether result was cached
+    }>;
+  }>;
+}
+```
+
+#### nx_cloud_fix_cipe_failure
+
+**Purpose:** Get detailed logs for a specific failed task
+
+**Parameters:**
+```typescript
+{
+  cipeId: string;    // CIPE identifier from nx_cloud_cipe_details
+  taskId: string;    // Task identifier from task list
+}
+```
+
+**Returns:**
+```typescript
+{
+  taskId: string;
+  status: 'failed';
+  logs: string;      // Full console output from task execution
+  error: string;     // Error message
+  startTime: string;
+  endTime: string;
+  duration: number;
+}
+```
+
+### Common CI Error Patterns
+
+#### 1. TypeScript Compilation Errors
+```
+Symptoms: "Type checking failed", property access errors
+AI Actions:
+  1. Parse error location (file:line:column)
+  2. Read affected file
+  3. Identify type definition issues
+  4. Fix type definitions or imports
+  5. Validate with local build
+```
+
+#### 2. Test Failures
+```
+Symptoms: "X test(s) failed", assertion errors
+AI Actions:
+  1. Identify failing test file
+  2. Read test code and implementation
+  3. Analyze assertion vs actual behavior
+  4. Fix implementation or update test
+  5. Run tests locally to confirm
+```
+
+#### 3. Linting Errors
+```
+Symptoms: "ESLint errors", "Prettier formatting"
+AI Actions:
+  1. Run linter locally to see errors
+  2. Apply automatic fixes (eslint --fix)
+  3. Manual fixes for complex violations
+  4. Validate with local lint run
+```
+
+#### 4. Missing Dependencies
+```
+Symptoms: "Cannot find module", import errors
+AI Actions:
+  1. Identify missing package
+  2. Check if it should be in dependencies
+  3. Add to package.json
+  4. Run install and rebuild
+  5. Validate locally
+```
+
+#### 5. Environment Issues
+```
+Symptoms: "Environment variable not set", config errors
+AI Actions:
+  1. Identify required environment variables
+  2. Check CI configuration (.github/workflows, etc.)
+  3. Suggest adding variables to CI secrets
+  4. Provide fallback defaults if appropriate
+```
+
+### Benefits of AI-Assisted CI Debugging
+
+1. **Fast Root Cause Analysis:** AI quickly identifies the exact cause from logs
+2. **Contextual Understanding:** AI reads related files to understand full context
+3. **Automated Fixes:** AI can fix common issues automatically
+4. **Validation:** AI runs tasks locally to confirm fixes work
+5. **Prevention:** AI checks for related issues proactively
+6. **Learning:** AI patterns improve over time with more examples
+
+### Integration with Agent Configuration
+
+This pipeline is automatically available when:
+1. Nx Cloud is configured in workspace
+2. AI agent is set up with `nx configure-ai-agents`
+3. CI Error Guidelines are appended to agent config
+
+The guidelines ensure AI follows a consistent workflow:
+```
+1. Use nx_cloud_cipe_details → Get CIPE list
+2. Use nx_cloud_fix_cipe_failure → Get task logs
+3. Analyze logs and identify issue
+4. Fix the problem
+5. Validate by running the failed task locally
+```
+
+---
+
+## Summary of All Pipelines
+
+### 1. Documentation AI Assistant Pipeline
+- **Purpose:** Answer user questions about Nx using documentation
+- **Key Technology:** RAG with vector search (Supabase)
+- **Model:** OpenAI GPT-4o-mini
+- **Prompt:** System prompt with strict documentation-only constraint
+
+### 2. Agent Configuration Pipeline
+- **Purpose:** Set up AI agents to work effectively with Nx
+- **Key Technology:** MCP (Model Context Protocol)
+- **Outputs:** CLAUDE.md, AGENTS.md, .mcp.json, etc.
+- **Prompts:** Agent rules, CI guidelines
+
+### 3. Migration Assistant Pipeline
+- **Purpose:** AI-assisted code transformations during upgrades
+- **Key Technology:** LLM-executable migration instructions
+- **Examples:** Vitest 4.0, Storybook CJS→ESM
+- **Prompts:** 719-line comprehensive migration guides
+
+### 4. CI Error Resolution Pipeline
+- **Purpose:** Debug and fix CI failures using Nx Cloud
+- **Key Technology:** MCP tools for CIPE/log retrieval
+- **Models:** Agent's native LLM (Claude, GPT, Gemini, etc.)
+- **Prompts:** CI Error Guidelines
+
+### Pipeline Interconnections
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        NX AI ECOSYSTEM                          │
+└─────────────────────────────────────────────────────────────────┘
+
+                    Workspace Initialization
+                            │
+                            ▼
+                  ┌─────────────────────┐
+                  │  Agent Configuration │
+                  │      Pipeline        │
+                  └─────────┬───────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              │             │             │
+              ▼             ▼             ▼
+      ┌──────────┐   ┌──────────┐   ┌──────────┐
+      │ CLAUDE.md│   │ .mcp.json│   │ AGENTS.md│
+      └─────┬────┘   └────┬─────┘   └────┬─────┘
+            │             │              │
+            └─────────────┼──────────────┘
+                          │
+                    MCP Server
+                          │
+        ┌─────────────────┼─────────────────┐
+        │                 │                 │
+        ▼                 ▼                 ▼
+┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+│   nx_docs     │ │ nx_workspace  │ │ nx_cloud_*    │
+│  (Documentation│ │ (Architecture)│ │ (CI Debugging)│
+│   AI Pipeline) │ │               │ │  Pipeline)    │
+└───────────────┘ └───────────────┘ └───────────────┘
+        │                                   │
+        │                                   │
+        ▼                                   ▼
+  [Answers about Nx]              [Fix CI failures]
+
+
+        Migration Needed?
+               │
+               ▼
+     ┌─────────────────────┐
+     │   Migration Assistant│
+     │      Pipeline        │
+     └─────────────────────┘
+               │
+               ▼
+     [Automated code updates]
+```
+
+### Key Takeaways
+
+1. **Comprehensive Integration:** All pipelines work together to provide full AI assistance
+2. **MCP-Powered:** Model Context Protocol enables tool-based agent interactions
+3. **Autonomous Execution:** Prompts designed for LLMs to execute independently
+4. **Validation Built-in:** Every pipeline includes validation steps
+5. **Nx-Aware:** All prompts understand Nx commands, architecture, and best practices
+
+---
+
+*Documentation complete. For detailed prompt content, see PROMPTS_DOCUMENTATION.md*
+
 
