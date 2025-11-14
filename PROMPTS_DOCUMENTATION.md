@@ -310,3 +310,138 @@ Provide a summary of:
 ```
 
 ---
+
+### 5. CI Error Guidelines (Nx Cloud Integration)
+
+**Purpose:** Instructions for AI agents to help users debug and fix CI pipeline errors when Nx Cloud is enabled. This prompt guides agents through a systematic workflow of retrieving CI pipeline execution details, analyzing error logs, and helping fix issues. These guidelines are appended to the agent configuration when Nx Cloud is detected.
+
+**Location:** Injected in `CLAUDE.md` and agent configuration files when Nx Cloud is enabled
+
+**Appended To:** Agent configuration prompts (see section 2)
+
+**MCP Tools Used:**
+- `nx_cloud_cipe_details` - Retrieves CI Pipeline Execution details
+- `nx_cloud_fix_cipe_failure` - Gets logs for specific failed tasks
+
+**Prompt:**
+
+```markdown
+# CI Error Guidelines
+
+If the user wants help with fixing an error in their CI pipeline, use the following flow:
+
+- Retrieve the list of current CI Pipeline Executions (CIPEs) using the `nx_cloud_cipe_details` tool
+- If there are any errors, use the `nx_cloud_fix_cipe_failure` tool to retrieve the logs for a specific task
+- Use the task logs to see what's wrong and help the user fix their problem. Use the appropriate tools if necessary
+- Make sure that the problem is fixed by running the task that you passed into the `nx_cloud_fix_cipe_failure` tool
+```
+
+---
+
+### 6. GitHub Issue Response Mode Guidelines
+
+**Purpose:** Instructions for AI agents working on GitHub issues in the Nx repository to determine whether to plan first or implement immediately based on user intent. This helps agents provide appropriate responses based on action verbs in issue requests.
+
+**Location:** `CLAUDE.md` - Repository-specific agent configuration
+
+**Used By:** AI agents (Claude Code, etc.) when working on GitHub issues
+
+**Decision Logic:**
+- **Plan-First Mode:** Triggered by verbs like "analyze", "investigate", "assess", "review", "examine", "plan"
+- **Immediate Implementation Mode:** Triggered by verbs like "fix", "implement", "solve", "build", "create", "update", "add"
+
+**Prompt:**
+
+```markdown
+## GitHub Issue Response Mode
+
+When responding to GitHub issues, determine your approach based on how the request is phrased:
+
+### Plan-First Mode (Default)
+
+Use this approach when users ask you to:
+
+- "analyze", "investigate", "assess", "review", "examine", or "plan"
+- Or when the request is ambiguous
+
+In this mode:
+
+1. Provide a detailed analysis of the issue
+2. Create a comprehensive implementation plan
+3. Break down the solution into clear steps
+4. Then please post the plan as a comment on the issue
+
+### Immediate Implementation Mode
+
+Use this approach when users ask you to:
+
+- "fix", "implement", "solve", "build", "create", "update", or "add"
+- Or when they explicitly request immediate action
+
+In this mode:
+
+1. Analyze the issue quickly
+2. Implement the complete solution immediately
+3. Make all necessary code changes. Please make multiple commits so that the changes are easier to review.
+4. Run appropriate tests and validation
+5. If the tests, are not passing, please fix the issues and continue doing this up to 3 more times until the tests pass
+6. Once the tests pass, push a branch and then suggest opening a PR which has a description of the changes made, and that it make sure that it explicitly says "Fixes #ISSUE_NUMBER" to automatically close the issue when the PR is merged.
+```
+
+---
+
+## Interactive CLI Prompts
+
+### 7. AI Agent Selection Prompt
+
+**Purpose:** Interactive CLI prompt displayed during workspace initialization (`nx init`) and workspace creation (`create-nx-workspace`) to ask users which AI agents they want to configure. Uses multi-select interface to allow selecting multiple agents.
+
+**Location:**
+- `packages/nx/src/command-line/init/ai-agent-prompts.ts`
+- `packages/create-nx-workspace/src/internal-utils/prompts.ts`
+
+**Display Context:**
+- Shown only in interactive mode (not in CI)
+- Skipped if agents are already specified via CLI args
+
+**Available Agents:**
+- Claude Code (Claude)
+- GitHub Copilot
+- Cursor
+- Google Gemini
+- OpenAI Codex
+
+**Prompt Text:**
+
+```
+Which AI agents, if any, would you like to set up?
+
+[Multi-select list of agents]
+
+Multiple selections possible. <Space> to select. <Enter> to confirm.
+```
+
+**Implementation:**
+
+```typescript
+async function aiAgentsPrompt(): Promise<Agent[]> {
+  const promptConfig = {
+    name: 'agents',
+    message: 'Which AI agents, if any, would you like to set up?',
+    type: 'multiselect',
+    choices: supportedAgents.map((a) => ({
+      name: a,
+      message: agentDisplayMap[a],
+    })),
+    footer: () =>
+      chalk.dim(
+        'Multiple selections possible. <Space> to select. <Enter> to confirm.'
+      ),
+  };
+  return (await prompt<{ agents: Agent[] }>([promptConfig])).agents;
+}
+```
+
+**Follow-up Action:** Selected agents trigger the `@nx/nx:set-up-ai-agents` generator which creates appropriate configuration files and injects agent rules.
+
+---
