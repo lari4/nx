@@ -244,3 +244,320 @@ Error Points:
 
 ---
 
+## Agent Configuration Pipeline
+
+**Purpose:** Automatically configures AI agents (Claude Code, GitHub Copilot, Cursor, Gemini, Codex) to work effectively with Nx workspaces by creating configuration files and injecting Nx-specific guidelines.
+
+**Components:**
+- CLI Prompts: `packages/nx/src/command-line/init/ai-agent-prompts.ts`
+- Generator: `packages/nx/src/ai/set-up-ai-agents/set-up-ai-agents.ts`
+- Rules Generator: `packages/nx/src/ai/set-up-ai-agents/get-agent-rules.ts`
+- MCP Integration: `packages/nx/src/command-line/mcp/mcp.ts`
+
+### Pipeline Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     AGENT CONFIGURATION PIPELINE                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Trigger Event
+    │
+    ├─[A] nx init (existing workspace)
+    ├─[B] create-nx-workspace (new workspace)
+    └─[C] nx configure-ai-agents (manual command)
+    │
+    ▼
+[1. Determine Which Agents to Configure]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   IF: CLI args provided (--aiAgents=claude,copilot)                     │
+│       → Skip prompt, use provided agents                                 │
+│                                                                           │
+│   IF: Non-interactive mode or CI environment                             │
+│       → Skip agent configuration                                          │
+│                                                                           │
+│   ELSE: Show interactive prompt                                          │
+│       → Component: aiAgentsPrompt()                                      │
+│       → Prompt: "Which AI agents would you like to set up?"             │
+│       → Type: Multi-select (Space to select, Enter to confirm)          │
+│       → Options:                                                          │
+│           • Claude Code                                                   │
+│           • GitHub Copilot                                                │
+│           • Cursor                                                        │
+│           • Google Gemini                                                 │
+│           • OpenAI Codex                                                  │
+│                                                                           │
+│   Output: Array<Agent> (e.g., ['claude', 'copilot'])                    │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[2. Detect Nx Cloud Status]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • Check: Look for nx.json with nxCloud configuration                  │
+│   • Check: Environment variables (NX_CLOUD_ACCESS_TOKEN, etc.)          │
+│   • Output: boolean (nxCloudEnabled)                                     │
+│   • Purpose: Determines if CI error guidelines should be included       │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[3. Generate Agent Rules Content]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • Function: getAgentRules(nxCloud)                                     │
+│   • Prompt Used: See PROMPTS_DOCUMENTATION.md #2                         │
+│   • Base Content:                                                         │
+│       - Nx command usage guidelines                                       │
+│       - MCP tool usage instructions                                       │
+│       - Best practices for Nx workspaces                                  │
+│                                                                           │
+│   • IF nxCloud === true:                                                 │
+│       Append CI Error Guidelines (PROMPTS_DOCUMENTATION.md #5)           │
+│                                                                           │
+│   • Output: String (markdown content)                                    │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[4. Create Configuration Files for Each Agent]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   For EACH selected agent:                                               │
+│                                                                           │
+│   ┌─ CLAUDE CODE ────────────────────────────────────────────────────┐  │
+│   │                                                                    │  │
+│   │   • Create/Update: CLAUDE.md (workspace root)                     │  │
+│   │   • Content: Repository-specific instructions + agent rules      │  │
+│   │   • Sections:                                                      │  │
+│   │       - Essential Commands                                         │  │
+│   │       - Testing workflows                                          │  │
+│   │       - GitHub Issue Response Mode                                 │  │
+│   │       - Agent rules (injected between markers)                     │  │
+│   │   • Markers:                                                       │  │
+│   │       <!-- nx configuration start-->                              │  │
+│   │       [Agent rules content]                                        │  │
+│   │       <!-- nx configuration end-->                                │  │
+│   │                                                                    │  │
+│   └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│   ┌─ GITHUB COPILOT / CURSOR ────────────────────────────────────────┐  │
+│   │                                                                    │  │
+│   │   • Create/Update: AGENTS.md (workspace root)                     │  │
+│   │   • Content: Generic agent instructions                           │  │
+│   │   • Same structure as CLAUDE.md but without repo-specific rules  │  │
+│   │                                                                    │  │
+│   └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│   ┌─ GOOGLE GEMINI ──────────────────────────────────────────────────┐  │
+│   │                                                                    │  │
+│   │   • Create: .gemini/ directory                                    │  │
+│   │   • Create: .gemini/settings.json                                 │  │
+│   │   • Content (JSON):                                                │  │
+│   │       {                                                            │  │
+│   │         "instructions": [                                          │  │
+│   │           {                                                         │  │
+│   │             "instruction": "nx configuration",                     │  │
+│   │             "content": "# General Guidelines for working with Nx"  │  │
+│   │           }                                                         │  │
+│   │         ]                                                           │  │
+│   │       }                                                             │  │
+│   │                                                                    │  │
+│   └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│   ┌─ OPENAI CODEX ───────────────────────────────────────────────────┐  │
+│   │                                                                    │  │
+│   │   • Create: .codex/ directory                                     │  │
+│   │   • Create: .codex/config.toml                                    │  │
+│   │   • Content (TOML):                                                │  │
+│   │       [mcp.nx]                                                     │  │
+│   │       command = "npx"                                              │  │
+│   │       args = ["-y", "@nx/mcp"]                                    │  │
+│   │                                                                    │  │
+│   └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+│   ┌─ MCP CONFIGURATION ──────────────────────────────────────────────┐  │
+│   │                                                                    │  │
+│   │   • Create: .mcp.json (workspace root)                            │  │
+│   │   • Content:                                                       │  │
+│   │       {                                                            │  │
+│   │         "mcpServers": {                                            │  │
+│   │           "nx": {                                                  │  │
+│   │             "command": "npx",                                      │  │
+│   │             "args": ["-y", "@nx/mcp"]                             │  │
+│   │           }                                                         │  │
+│   │         }                                                           │  │
+│   │       }                                                             │  │
+│   │   • Purpose: Enables MCP server for workspace understanding       │  │
+│   │                                                                    │  │
+│   └────────────────────────────────────────────────────────────────────┘  │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[5. Update .gitignore]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • Read existing .gitignore                                             │
+│   • Check if AI config files are already ignored                         │
+│   • Add if missing:                                                      │
+│       # AI Agent Configuration                                           │
+│       .codex/                                                            │
+│       .gemini/                                                           │
+│       .mcp.json                                                          │
+│   • Note: CLAUDE.md and AGENTS.md are typically committed               │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[6. Display Success Message]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   Output to user:                                                        │
+│                                                                           │
+│   ✅ AI agents configured successfully!                                 │
+│                                                                           │
+│   Configured agents:                                                     │
+│   • Claude Code (CLAUDE.md)                                             │
+│   • GitHub Copilot (AGENTS.md)                                          │
+│                                                                           │
+│   MCP Server: Configured in .mcp.json                                   │
+│                                                                           │
+│   Next steps:                                                            │
+│   1. Restart your AI agent/IDE to load new configuration                │
+│   2. Try asking your agent about Nx workspace structure                 │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration File Templates
+
+#### CLAUDE.md Structure
+```markdown
+[Repository-specific instructions]
+
+<!-- nx configuration start-->
+# General Guidelines for working with Nx
+[Agent rules content from getAgentRules()]
+
+# CI Error Guidelines
+[Optional: If Nx Cloud enabled]
+<!-- nx configuration end-->
+```
+
+#### AGENTS.md Structure
+```markdown
+<!-- nx configuration start-->
+# General Guidelines for working with Nx
+[Agent rules content from getAgentRules()]
+
+# CI Error Guidelines
+[Optional: If Nx Cloud enabled]
+<!-- nx configuration end-->
+```
+
+#### .gemini/settings.json Structure
+```json
+{
+  "instructions": [
+    {
+      "instruction": "nx configuration",
+      "content": "[Agent rules markdown content]"
+    }
+  ]
+}
+```
+
+#### .mcp.json Structure
+```json
+{
+  "mcpServers": {
+    "nx": {
+      "command": "npx",
+      "args": ["-y", "@nx/mcp"]
+    }
+  }
+}
+```
+
+#### .codex/config.toml Structure
+```toml
+[mcp.nx]
+command = "npx"
+args = ["-y", "@nx/mcp"]
+```
+
+### MCP Tools Available After Configuration
+
+Once configured, agents can use these MCP tools:
+
+1. **nx_workspace**
+   - Purpose: Get workspace architecture overview
+   - Returns: Project list, dependencies, configuration errors
+   - Usage: "Show me the workspace structure"
+
+2. **nx_project_details**
+   - Purpose: Analyze individual project
+   - Input: Project name
+   - Returns: Project config, dependencies, targets
+   - Usage: "What are the dependencies of the 'api' project?"
+
+3. **nx_docs**
+   - Purpose: Query Nx documentation
+   - Input: Search query
+   - Returns: Relevant documentation content
+   - Usage: "How do I configure caching in Nx?"
+
+4. **nx_cloud_cipe_details** (if Nx Cloud enabled)
+   - Purpose: Get CI pipeline execution details
+   - Returns: List of CIPEs with status and failures
+   - Usage: "Show me recent CI failures"
+
+5. **nx_cloud_fix_cipe_failure** (if Nx Cloud enabled)
+   - Purpose: Get detailed logs for failed tasks
+   - Input: CIPE ID and task ID
+   - Returns: Task logs and error details
+   - Usage: "Show me logs for the failed build task"
+
+### Agent Behavior After Configuration
+
+**Before Configuration:**
+```
+User: "Run tests for the affected projects"
+Agent: *Runs npm test or yarn test directly*
+```
+
+**After Configuration:**
+```
+User: "Run tests for the affected projects"
+Agent: *Reads agent rules from CLAUDE.md/AGENTS.md*
+Agent: *Uses nx affected -t test (following guidelines)*
+```
+
+### Update Mechanism
+
+Configuration files use markers to allow updates:
+
+```markdown
+<!-- nx configuration start-->
+[Content managed by Nx generator]
+<!-- nx configuration end-->
+```
+
+When running `nx configure-ai-agents` again:
+1. Generator finds existing markers
+2. Preserves custom content outside markers
+3. Updates only content between markers
+4. Prevents accidental overwrites
+
+---
+
+
