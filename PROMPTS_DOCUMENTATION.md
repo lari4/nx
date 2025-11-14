@@ -75,3 +75,91 @@ You are a knowledgeable Nx representative. You can answer queries using ONLY inf
 **Note:** When `nxCloud` is enabled, additional CI error handling guidelines are appended (documented in CI Error Guidelines section below).
 
 ---
+
+## Migration Assistant Prompts
+
+### 3. Vitest 4.0 Migration Instructions for LLM
+
+**Purpose:** Comprehensive instructions for AI agents to systematically migrate Nx workspace projects from Vitest 3.x to Vitest 4.0. This prompt covers all breaking changes including configuration updates, test code modifications, reporter API changes, and validation steps. It's designed to be executed by an LLM autonomously with clear checklists and transformation patterns.
+
+**Location:** `packages/vitest/src/migrations/update-22-1-0/files/ai-instructions-for-vitest-4.md`
+
+**Created By:** Migration generator at `packages/vitest/src/migrations/update-22-1-0/create-ai-instructions-for-vitest-4.ts`
+
+**Trigger:** Automatically created when running Nx migrations for Vitest 4.0 upgrade
+
+**Target Files:**
+- `vitest.config.{ts,js,mjs}` - Vitest configuration files
+- `vitest.workspace.{ts,js,mjs}` - Workspace configuration files
+- `**/*.{spec,test}.{ts,js,tsx,jsx}` - Test files
+- `project.json` files with test targets
+
+**Migration Categories Covered:**
+1. Configuration File Updates (coverage, pool options, workspace rename)
+2. Test Code Updates (mock function changes, spy behavior)
+3. Reporter and CLI Changes
+4. Snapshot Changes
+5. Environment Variable Updates
+6. Module Runner Changes
+7. Type Definition Updates
+
+**Key Transformation Patterns:**
+- `coverage.all` → `coverage.include` (explicit patterns)
+- `maxThreads`/`maxForks` → `maxWorkers` (unified)
+- `workspace` → `projects` (renamed property)
+- `vi.fn()` default name: `'spy'` → `'vi.fn()'`
+- `invocationCallOrder`: 0-based → 1-based indexing
+- `browser.provider: 'playwright'` → `browser.provider: { name: 'playwright' }`
+- `@vitest/browser` → `vitest/browser` (import path change)
+
+**Validation Commands:**
+- `nx show projects --with-target test` - Find all Vitest projects
+- `nx run-many -t test -p PROJECT_NAME` - Test individual projects
+- `nx affected -t test` - Test all affected projects
+- `nx prepush` - Full validation suite
+
+**Prompt:** (See full content in file `packages/vitest/src/migrations/update-22-1-0/files/ai-instructions-for-vitest-4.md`)
+
+Due to the length of this prompt (719 lines), please refer to the source file for complete instructions. Key sections include:
+
+```markdown
+# Vitest 4.0 Migration Instructions for LLM
+
+## Overview
+These instructions guide you through migrating an Nx workspace containing multiple
+Vitest projects from Vitest 3.x to Vitest 4.0. Work systematically through each
+breaking change category.
+
+## Pre-Migration Checklist
+1. Identify all Vitest projects
+2. Locate all Vitest configuration files
+3. Identify affected code
+
+## Migration Steps by Category
+
+### 1. Configuration File Updates
+#### 1.1 Coverage Configuration
+- Remove: coverage.all, coverage.extensions, coverage.ignoreEmptyLines
+- Add: explicit coverage.include patterns
+
+#### 1.2 Pool Options Restructuring
+- Replace maxThreads and maxForks with single maxWorkers option
+- Move poolOptions.* nested options to top-level
+
+[... continues with all 7 categories ...]
+
+## Post-Migration Validation
+1. Run tests per project
+2. Run all tests
+3. Check coverage
+4. Validate CI pipeline
+5. Review migration checklist
+
+## Notes for LLM Execution
+- Work systematically: Complete one category before moving to the next
+- Test after each change
+- Use TodoWrite tool to track progress
+- Create meaningful commits
+```
+
+---
