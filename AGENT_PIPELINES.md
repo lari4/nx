@@ -560,4 +560,334 @@ When running `nx configure-ai-agents` again:
 
 ---
 
+## Migration Assistant Pipeline
+
+**Purpose:** Provides comprehensive AI-assisted code transformations during Nx version upgrades. Creates detailed migration instructions that LLMs can execute autonomously to update workspace code.
+
+**Components:**
+- Migration Generators: `packages/*/src/migrations/`
+- Instruction Files: `packages/*/src/migrations/*/files/ai-instructions-*.md`
+- Migration Engine: Nx migrate command
+
+### Example: Vitest 4.0 Migration Pipeline
+
+This pipeline demonstrates how Nx uses AI assistants to perform complex code migrations.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    MIGRATION ASSISTANT PIPELINE                         │
+│                      (Vitest 3.x → 4.0 Example)                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Migration Trigger
+    │
+    └─ User runs: nx migrate @nx/workspace@latest
+    │
+    ▼
+[1. Nx Migrate Detects Available Migrations]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • Reads package.json versions                                          │
+│   • Compares with migration registry                                     │
+│   • Detects: vitest upgrade needed (3.x → 4.0)                          │
+│   • Migration: update-22-1-0/create-ai-instructions-for-vitest-4        │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[2. Generate Migration Instructions File]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   • Generator: create-ai-instructions-for-vitest-4.ts                    │
+│   • Creates: VITEST_4_MIGRATION_INSTRUCTIONS.md                          │
+│   • Location: Workspace root                                             │
+│   • Content: Complete LLM migration prompt (see #3 in                    │
+│              PROMPTS_DOCUMENTATION.md)                                   │
+│   • Size: 719 lines of detailed instructions                             │
+│                                                                           │
+│   Output Message:                                                         │
+│   ═══════════════════════════════════════════════════════                │
+│   📝 Vitest 4.0 Migration Instructions Created                           │
+│                                                                           │
+│   File: VITEST_4_MIGRATION_INSTRUCTIONS.md                              │
+│                                                                           │
+│   This file contains comprehensive instructions for your                 │
+│   AI coding assistant to help migrate your Vitest                        │
+│   configuration and tests to version 4.0.                                │
+│                                                                           │
+│   Next steps:                                                             │
+│   1. Open the file in your AI assistant (Claude, Copilot, etc.)         │
+│   2. Ask: "Help me migrate to Vitest 4.0 using these instructions"      │
+│   3. The assistant will work through each section systematically         │
+│   ═══════════════════════════════════════════════════════                │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[3. User Invokes AI Assistant with Instructions]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   User: "Help me migrate to Vitest 4.0 using these instructions"        │
+│   [Provides VITEST_4_MIGRATION_INSTRUCTIONS.md to AI]                   │
+│                                                                           │
+│   AI Agent: *Reads 719-line migration prompt*                            │
+│   AI Agent: *Creates todo list with 7 major categories*                  │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[4. AI Executes Migration - Phase 1: Discovery]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   [4.1] Find All Vitest Projects                                         │
+│         Command: nx show projects --with-target test                     │
+│         Result: List of projects with Vitest (e.g., 15 projects)         │
+│                                                                           │
+│   [4.2] Locate Configuration Files                                       │
+│         Pattern: **/vitest.config.{ts,js,mjs}                           │
+│         Pattern: **/project.json (with vitest test target)              │
+│         Result: 20 configuration files found                             │
+│                                                                           │
+│   [4.3] Identify Test Files                                              │
+│         Pattern: **/*.{spec,test}.{ts,js,tsx,jsx}                       │
+│         Result: 500+ test files                                          │
+│                                                                           │
+│   Output: Complete inventory of files requiring migration                │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[5. AI Executes Migration - Phase 2: Configuration Updates]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   For EACH vitest.config.* file:                                         │
+│                                                                           │
+│   [5.1] Coverage Configuration                                           │
+│         Search: coverage.all, coverage.extensions                        │
+│         Transform:                                                        │
+│           BEFORE: coverage: { all: true, extensions: ['.ts'] }          │
+│           AFTER:  coverage: { include: ['src/**/*.ts'] }                │
+│                                                                           │
+│   [5.2] Pool Options Restructuring                                       │
+│         Search: maxThreads, maxForks, poolOptions                        │
+│         Transform:                                                        │
+│           BEFORE: maxThreads: 4, poolOptions: { ... }                   │
+│           AFTER:  maxWorkers: 4, [options moved to top-level]          │
+│                                                                           │
+│   [5.3] Workspace → Projects Rename                                      │
+│         Search: workspace property                                        │
+│         Transform:                                                        │
+│           BEFORE: workspace: ['apps/*', 'libs/*']                        │
+│           AFTER:  projects: ['apps/*', 'libs/*']                        │
+│                                                                           │
+│   [5.4] Browser Configuration                                            │
+│         Search: browser.provider                                          │
+│         Transform:                                                        │
+│           BEFORE: provider: 'playwright'                                 │
+│           AFTER:  provider: { name: 'playwright' }                      │
+│                                                                           │
+│   After each file: Run nx run PROJECT:test to validate                  │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[6. AI Executes Migration - Phase 3: Test Code Updates]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   For EACH test file:                                                    │
+│                                                                           │
+│   [6.1] Mock Function Name Changes                                       │
+│         Search: .getMockName()                                           │
+│         Update assertions:                                                │
+│           BEFORE: expect(mock.getMockName()).toBe('spy')                 │
+│           AFTER:  expect(mock.getMockName()).toBe('vi.fn()')            │
+│                                                                           │
+│   [6.2] Mock Invocation Call Order                                       │
+│         Search: .mock.invocationCallOrder                                │
+│         Transform: 0-based → 1-based indexing                           │
+│           BEFORE: expect(mock.invocationCallOrder[0]).toBe(0)            │
+│           AFTER:  expect(mock.invocationCallOrder[0]).toBe(1)           │
+│                                                                           │
+│   [6.3] Constructor Spy Updates                                          │
+│         Search: vi.fn(() => {...}) used with 'new'                      │
+│         Transform: Arrow function → function keyword                     │
+│           BEFORE: const Mock = vi.fn(() => ({ x: 1 }))                  │
+│           AFTER:  const Mock = vi.fn(function() { return { x: 1 } })    │
+│                                                                           │
+│   [6.4] Import Path Changes                                              │
+│         Search: from '@vitest/browser'                                   │
+│         Replace: from 'vitest/browser'                                   │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[7. AI Executes Migration - Phase 4: Validation]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   [7.1] Test Individual Projects                                         │
+│         For each modified project:                                       │
+│         Command: nx run-many -t test -p PROJECT_NAME                     │
+│         Check: All tests pass                                            │
+│                                                                           │
+│   [7.2] Test All Affected Projects                                       │
+│         Command: nx affected -t test                                     │
+│         Check: No regressions                                            │
+│                                                                           │
+│   [7.3] Verify Coverage Generation                                       │
+│         Command: nx affected -t test --coverage                          │
+│         Check: Coverage reports generate correctly                       │
+│                                                                           │
+│   [7.4] Run Full Validation                                              │
+│         Command: nx prepush                                              │
+│         Check: All linting, tests, builds pass                           │
+│                                                                           │
+│   IF any validation fails:                                               │
+│       → AI debugs and fixes issues                                       │
+│       → Re-runs validation                                               │
+│       → Maximum 3 retry attempts                                         │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[8. AI Creates Migration Commits]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   AI creates multiple focused commits:                                   │
+│                                                                           │
+│   Commit 1: "chore(vitest): update coverage configuration"              │
+│   - Updates all coverage.all → coverage.include                         │
+│                                                                           │
+│   Commit 2: "chore(vitest): restructure pool options"                   │
+│   - Consolidates maxThreads/maxForks → maxWorkers                       │
+│                                                                           │
+│   Commit 3: "chore(vitest): rename workspace to projects"               │
+│   - Updates all workspace properties                                     │
+│                                                                           │
+│   Commit 4: "test(vitest): update mock assertions for v4"               │
+│   - Fixes mock function name expectations                                │
+│   - Updates invocation call order indexing                               │
+│                                                                           │
+│   Commit 5: "fix(vitest): update browser imports and config"            │
+│   - Changes import paths                                                 │
+│   - Updates provider configuration format                                │
+│                                                                           │
+│   Each commit includes:                                                  │
+│   - Clear description of changes                                         │
+│   - Reason for change (Vitest 4.0 migration)                            │
+│   - Files affected count                                                 │
+│                                                                           │
+└───┬─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+[9. Migration Complete - AI Reports]
+    │
+┌───┴─────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   ✅ Vitest 4.0 Migration Complete                                       │
+│                                                                           │
+│   Summary:                                                                │
+│   • 15 projects migrated                                                 │
+│   • 20 configuration files updated                                       │
+│   • 500+ test files reviewed                                             │
+│   • 50 test files modified                                               │
+│   • 5 commits created                                                    │
+│   • All tests passing ✓                                                  │
+│   • Coverage generation working ✓                                        │
+│   • Full validation passed ✓                                             │
+│                                                                           │
+│   Breaking changes addressed:                                            │
+│   ✓ Coverage configuration updated                                       │
+│   ✓ Pool options restructured                                            │
+│   ✓ Workspace renamed to projects                                        │
+│   ✓ Mock function behaviors updated                                      │
+│   ✓ Browser imports and config modernized                                │
+│                                                                           │
+│   Next steps:                                                             │
+│   1. Review the commits                                                   │
+│   2. Run nx prepush to double-check                                      │
+│   3. Push to remote and create PR                                        │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Migration Instruction Structure
+
+The AI migration instructions follow a systematic format:
+
+1. **Overview Section**
+   - Migration scope and goals
+   - What will be changed
+   - Expected outcome
+
+2. **Pre-Migration Checklist**
+   - Commands to identify affected files
+   - Inventory of projects and configurations
+   - Risk assessment
+
+3. **Migration Steps by Category**
+   - Each breaking change as a separate section
+   - Before/after code examples
+   - Search patterns to find affected code
+   - Transformation rules
+   - Validation steps
+
+4. **Post-Migration Validation**
+   - Testing commands
+   - Success criteria
+   - Rollback procedures if needed
+
+5. **Notes for LLM Execution**
+   - Workflow guidance (work systematically)
+   - Tool usage instructions (use TodoWrite)
+   - Commit strategy (multiple focused commits)
+   - Error handling guidance
+
+### Other Migration Types
+
+**Storybook CJS to ESM Migration:**
+```
+Trigger: Storybook version upgrade
+Instructions: ai-instructions-for-cjs-esm.md
+Focus: Module syntax transformation
+Files: .storybook/main.{ts,js}
+Transformations:
+  • module.exports → export default
+  • require() → import
+  • Dynamic requires → Top-level imports
+```
+
+**Future Migration Pattern:**
+```
+Any Nx package can create AI migration instructions:
+
+1. Create migration file:
+   packages/PACKAGE/src/migrations/VERSION/files/ai-instructions-for-CHANGE.md
+
+2. Create generator:
+   packages/PACKAGE/src/migrations/VERSION/create-ai-instructions-for-CHANGE.ts
+
+3. Register in migrations.json
+
+4. Instructions appear during: nx migrate @nx/PACKAGE@VERSION
+```
+
+### Benefits of AI-Assisted Migrations
+
+1. **Comprehensive Coverage:** AI can process hundreds of files systematically
+2. **Context Awareness:** AI understands code patterns and edge cases
+3. **Validation:** AI can run tests and fix issues iteratively
+4. **Documentation:** AI creates clear commit messages explaining changes
+5. **Reduced Human Error:** Follows checklist rigorously
+6. **Speed:** Minutes instead of hours for large workspaces
+
+---
+
 
