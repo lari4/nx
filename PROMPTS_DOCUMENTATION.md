@@ -445,3 +445,57 @@ async function aiAgentsPrompt(): Promise<Agent[]> {
 **Follow-up Action:** Selected agents trigger the `@nx/nx:set-up-ai-agents` generator which creates appropriate configuration files and injects agent rules.
 
 ---
+
+## Summary
+
+### Prompt Categories
+
+This documentation covers **7 distinct AI prompts** across **4 major categories**:
+
+#### 1. Documentation AI Assistant (1 prompt)
+- System prompt for nx.dev AI chat using RAG with GPT-4o-mini
+
+#### 2. Agent Configuration (3 prompts)
+- Nx MCP agent rules (core guidelines)
+- CI error handling guidelines (Nx Cloud)
+- GitHub issue response mode (plan vs implement)
+
+#### 3. Migration Assistants (2 prompts)
+- Vitest 4.0 migration instructions (comprehensive, 719 lines)
+- Storybook CJS to ESM transformation instructions
+
+#### 4. Interactive CLI (1 prompt)
+- AI agent selection during workspace setup
+
+### Key Integration Points
+
+1. **nx.dev Website:** Documentation AI assistant with vector search
+2. **Workspace Setup:** AI agent selection and configuration during `nx init`
+3. **Agent Configuration Files:** CLAUDE.md, AGENTS.md, .gemini/settings.json, .mcp.json
+4. **Migration Workflows:** AI-assisted code transformations during version upgrades
+5. **CI/CD Support:** Automated error diagnosis with Nx Cloud integration
+
+### MCP (Model Context Protocol) Tools
+
+AI agents configured with Nx have access to these MCP tools:
+- `nx_workspace` - Workspace architecture understanding
+- `nx_project_details` - Individual project analysis
+- `nx_docs` - Access to Nx documentation
+- `nx_cloud_cipe_details` - CI pipeline execution details
+- `nx_cloud_fix_cipe_failure` - Retrieve CI task logs
+
+### Supported AI Agents
+
+- **Claude Code** (Anthropic)
+- **GitHub Copilot** (Microsoft)
+- **Cursor** (IDE)
+- **Google Gemini**
+- **OpenAI Codex**
+
+---
+
+*Last Updated: [Generated dynamically]*
+*Total Documented Prompts: 7*
+*Lines of Prompt Content: ~1000+*
+
+
